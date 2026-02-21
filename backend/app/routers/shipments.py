@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from ..database import get_db
 from ..models import Shipment
 from ..schemas.shipment import ShipmentCreate, ShipmentUpdate, ShipmentRead
@@ -10,8 +10,28 @@ router = APIRouter(prefix="/shipments", tags=["shipments"])
 
 
 @router.get("/", response_model=List[ShipmentRead])
-def list_shipments(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(Shipment).order_by(Shipment.id.desc()).offset(skip).limit(limit).all()
+def list_shipments(
+    skip: int = 0,
+    limit: int = 200,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    facility_id: Optional[int] = None,
+    driver_id: Optional[int] = None,
+    truck_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(Shipment)
+    if date_from:
+        query = query.filter(Shipment.date >= date_from)
+    if date_to:
+        query = query.filter(Shipment.date <= date_to)
+    if facility_id:
+        query = query.filter(Shipment.facility_id == facility_id)
+    if driver_id:
+        query = query.filter(Shipment.driver_id == driver_id)
+    if truck_id:
+        query = query.filter(Shipment.truck_id == truck_id)
+    return query.order_by(Shipment.date.desc()).offset(skip).limit(limit).all()
 
 
 @router.get("/{shipment_id}", response_model=ShipmentRead)

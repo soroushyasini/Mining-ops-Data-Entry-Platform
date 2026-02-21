@@ -5,11 +5,16 @@ import Card from '../components/ui/Card'
 import Table from '../components/ui/Table'
 import Modal from '../components/ui/Modal'
 import Button from '../components/ui/Button'
+import FilterBar from '../components/ui/FilterBar'
+import StatsCards from '../components/ui/StatsCards'
 import BulkImportForm from '../components/forms/BulkImportForm'
 import BunkerLoadForm from '../components/forms/BunkerLoadForm'
 import { showToast, Toast } from '../components/ui/Toast'
+import { getFacilities } from '../api/facilities'
+import { getDrivers } from '../api/drivers'
 import {
   getBunkerLoads,
+  getBunkerLoadStats,
   createBunkerLoad,
   updateBunkerLoad,
   deleteBunkerLoad,
@@ -19,11 +24,15 @@ import {
 
 const COLUMNS = [
   { key: 'date', label: 'تاریخ' },
+  { key: 'time', label: 'ساعت' },
+  { key: 'truck_number_raw', label: 'شماره ماشین' },
+  { key: 'receipt_number', label: 'شماره قبض' },
   { key: 'tonnage_kg', label: 'تناژ (kg)' },
-  { key: 'cumulative_tonnage_kg', label: 'تناژ تجمعی (kg)' },
-  { key: 'sheet_name', label: 'شیت' },
-  { key: 'transport_cost_rial', label: 'هزینه حمل (ریال)', render: (v) => v ? new Intl.NumberFormat('fa-IR').format(v) : '—' },
+  { key: 'origin', label: 'مبدا' },
+  { key: 'total_cost_rial', label: 'مبلغ (ریال)', render: (v) => v ? new Intl.NumberFormat('fa-IR').format(v) : '—' },
 ]
+
+const EMPTY_FILTERS = { date_from: '', date_to: '', facility_id: null, driver_id: null }
 
 export default function BunkerLoads() {
   const qc = useQueryClient()
@@ -32,10 +41,30 @@ export default function BunkerLoads() {
   const [deleteRecord, setDeleteRecord] = useState(null)
   const [showBulk, setShowBulk] = useState(false)
   const [previewData, setPreviewData] = useState(null)
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+
+  const filterParams = Object.fromEntries(
+    Object.entries(filters).filter(([, v]) => v)
+  )
+
+  const { data: facilities = [] } = useQuery({
+    queryKey: ['facilities'],
+    queryFn: () => getFacilities(),
+  })
+
+  const { data: drivers = [] } = useQuery({
+    queryKey: ['drivers'],
+    queryFn: () => getDrivers(),
+  })
 
   const { data = [], isLoading } = useQuery({
-    queryKey: ['bunker-loads'],
-    queryFn: () => getBunkerLoads({ limit: 200 }),
+    queryKey: ['bunker-loads', filterParams],
+    queryFn: () => getBunkerLoads({ ...filterParams, limit: 200 }),
+  })
+
+  const { data: stats } = useQuery({
+    queryKey: ['bunker-loads-stats', filterParams],
+    queryFn: () => getBunkerLoadStats(filterParams),
   })
 
   const createMutation = useMutation({
@@ -80,6 +109,18 @@ export default function BunkerLoads() {
   return (
     <div className="space-y-6">
       <Toast />
+
+      <FilterBar
+        filters={filters}
+        setFilters={setFilters}
+        facilities={facilities}
+        drivers={drivers}
+        showDriverFilter
+        onReset={() => setFilters(EMPTY_FILTERS)}
+      />
+
+      <StatsCards stats={stats} />
+
       <Card
         title="بارگیری بونکر"
         actions={

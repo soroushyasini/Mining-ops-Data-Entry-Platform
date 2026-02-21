@@ -6,6 +6,9 @@ export const getBunkerLoads = (params = {}) =>
 export const getBunkerLoad = (id) =>
   client.get(`/api/bunker-loads/${id}`).then((r) => r.data)
 
+export const getBunkerLoadStats = (params = {}) =>
+  client.get('/api/bunker-loads/stats/summary', { params }).then((r) => r.data)
+
 export const createBunkerLoad = (data) =>
   client.post('/api/bunker-loads/', data).then((r) => r.data)
 

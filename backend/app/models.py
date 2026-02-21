@@ -108,11 +108,19 @@ class BunkerLoad(Base):
     __tablename__ = "bunker_loads"
 
     id = Column(Integer, primary_key=True, index=True)
-    date = Column(String(10), nullable=False)  # Jalali YYYY/MM/DD
-    tonnage_kg = Column(Float, nullable=False)
+    date = Column(String(10), nullable=False)          # Jalali YYYY/MM/DD — تاریخ
+    time = Column(String(5), nullable=True)             # HH:MM — ساعت
+    truck_number_raw = Column(String(20), nullable=True) # شماره ماشین (raw, for reference)
+    receipt_number = Column(String(50), nullable=True)  # شماره قبض
+    tonnage_kg = Column(Float, nullable=False)          # تناژ
+    origin = Column(String(200), nullable=True)         # مبدا
+    cost_per_ton_rial = Column(Float, nullable=True)    # هزینه حمل هر تن
+    total_cost_rial = Column(Float, nullable=True)      # مبلغ (ریال) = tonnage × cost_per_ton
+    notes = Column(Text, nullable=True)                 # توضیحات
+    # Legacy fields kept for backward compat
     cumulative_tonnage_kg = Column(Float, nullable=True)
-    transport_cost_rial = Column(Float, nullable=True)
     sheet_name = Column(String(100), nullable=True)
+    # Foreign keys
     facility_id = Column(Integer, ForeignKey("facilities.id"), nullable=True)
     driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())

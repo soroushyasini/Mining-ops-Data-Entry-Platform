@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from ..database import get_db
 from ..models import LabSample
 from ..schemas.lab_sample import LabSampleCreate, LabSampleUpdate, LabSampleRead
@@ -10,8 +10,25 @@ router = APIRouter(prefix="/lab-samples", tags=["lab_samples"])
 
 
 @router.get("/", response_model=List[LabSampleRead])
-def list_lab_samples(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(LabSample).order_by(LabSample.id.desc()).offset(skip).limit(limit).all()
+def list_lab_samples(
+    skip: int = 0,
+    limit: int = 200,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    facility_id: Optional[int] = None,
+    sample_type: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(LabSample)
+    if date_from:
+        query = query.filter(LabSample.date >= date_from)
+    if date_to:
+        query = query.filter(LabSample.date <= date_to)
+    if facility_id:
+        query = query.filter(LabSample.facility_id == facility_id)
+    if sample_type:
+        query = query.filter(LabSample.sample_type == sample_type)
+    return query.order_by(LabSample.id.desc()).offset(skip).limit(limit).all()
 
 
 @router.get("/{record_id}", response_model=LabSampleRead)
