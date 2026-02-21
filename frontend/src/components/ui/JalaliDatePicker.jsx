@@ -23,10 +23,10 @@ export default function JalaliDatePicker({ label, value, onChange, error, requir
 
   const daysInMonth = jalaali.jalaaliMonthLength(viewYear, viewMonth)
 
-  const firstDay = (() => {
+    const firstDay = (() => {
     const g = jalaali.toGregorian(viewYear, viewMonth, 1)
     const d = new Date(g.gy, g.gm - 1, g.gd).getDay() // 0=Sun
-    return (d + 1) % 7 // shift so Sat=0
+    return (d + 1) % 7 // shift: Sun→1, Mon→2, ..., Sat→0
   })()
 
   const handleDayClick = (day) => {

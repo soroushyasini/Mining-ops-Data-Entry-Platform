@@ -16,7 +16,8 @@ def bunker_loads_summary(
     facility_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    """Returns total tonnage, total cost, record count for the filtered period."""
+    """Returns total tonnage, total cost, record count for the filtered period.
+    Supports filters: date_from, date_to, facility_id."""
     query = db.query(BunkerLoad)
     if date_from:
         query = query.filter(BunkerLoad.date >= date_from)
