@@ -9,6 +9,8 @@ from app.modules.trucks.router import router as trucks_router
 from app.modules.attachments.router import router as attachments_router
 from app.modules.bunkers.router import router as bunkers_router
 from app.modules.lab.router import router as lab_router
+from app.modules.grinding.router import router as grinding_router
+from app.modules.payments.router import router as payments_router
 
 app = FastAPI(
     title="Mining Supply Chain API",
@@ -30,6 +32,8 @@ app.include_router(trucks_router, prefix="/api/v1/trucks", tags=["trucks"])
 app.include_router(attachments_router, prefix="/api/v1/attachments", tags=["attachments"])
 app.include_router(bunkers_router, prefix="/api/v1/bunkers", tags=["bunkers"])
 app.include_router(lab_router, prefix="/api/v1/lab", tags=["lab"])
+app.include_router(grinding_router, prefix="/api/v1/grinding", tags=["grinding"])
+app.include_router(payments_router, prefix="/api/v1/payments", tags=["payments"])
 
 
 @app.get("/health", tags=["health"])

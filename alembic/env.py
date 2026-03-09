@@ -16,6 +16,7 @@ import app.modules.attachments.models  # noqa: F401
 import app.modules.payments.models  # noqa: F401
 import app.modules.bunkers.models  # noqa: F401
 import app.modules.lab.models  # noqa: F401
+import app.modules.grinding.models  # noqa: F401
 
 config = context.config
 
