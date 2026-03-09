@@ -10,6 +10,7 @@ class GrindingFacility(str, Enum):
 class RecordStatus(str, Enum):
     REGISTERED = "registered"
     COSTED = "costed"
+    INVOICED = "invoiced"
     PAID = "paid"
 
 

@@ -15,8 +15,11 @@ from app.config import settings
 from app.modules.drivers.models import Driver
 from app.modules.cars.models import Car
 from app.modules.trucks.models import TruckLoad
+from app.modules.bunkers.models import BunkerLoad
+from app.modules.lab.models import LabIssueBatch, LabResult
 from app.shared.jalali import jalali_to_gregorian
 from app.shared.enums import RecordStatus
+from app.shared.sample_parser import parse_sample_code
 
 engine = create_async_engine(settings.database_url, echo=False)
 AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
@@ -53,6 +56,34 @@ TRUCK_LOADS = [
     {"date_jalali": "1404/11/13", "truck_plate_number": "23911", "receipt_number": 2835, "tonnage_kg": 26090, "destination": "robat_sefid", "cost_per_ton_rials": 8700000, "driver_name": "هادی احمدآبادی", "status": "registered"},
     {"date_jalali": "1404/11/13", "truck_plate_number": "97966", "receipt_number": 2836, "tonnage_kg": 24870, "destination": "robat_sefid", "cost_per_ton_rials": 8700000, "driver_name": "محمدرضا احمدآبادی", "status": "registered"},
     {"date_jalali": "1404/11/14", "truck_plate_number": "14978", "receipt_number": 2849, "tonnage_kg": 26150, "destination": "robat_sefid", "cost_per_ton_rials": 8700000, "driver_name": "محمد احمد آبادی", "status": "registered"},
+]
+
+BUNKER_LOADS = [
+    {"date_jalali": "1404/11/04", "source_facility": "robat_sefid", "receipt_number": 2271, "tonnage_kg": 23560, "truck_plate_number": "14978", "driver_name": "محمد احمد آبادی"},
+    {"date_jalali": "1404/11/08", "source_facility": "robat_sefid", "receipt_number": 2280, "tonnage_kg": 24810, "truck_plate_number": "81375", "driver_name": "حبیب احمدآبادی"},
+    {"date_jalali": "1404/11/09", "source_facility": "shen_beton", "receipt_number": 2283, "tonnage_kg": 18760, "truck_plate_number": "23911", "driver_name": "هادی احمدآبادی"},
+    {"date_jalali": "1404/11/09", "source_facility": "robat_sefid", "receipt_number": 2281, "tonnage_kg": 25900, "truck_plate_number": "97966", "driver_name": "محمدرضا احمدآبادی"},
+    {"date_jalali": "1404/11/09", "source_facility": "robat_sefid", "receipt_number": 2279, "tonnage_kg": 22580, "truck_plate_number": "48297", "driver_name": "احمد عرفانیان"},
+]
+
+LAB_BATCHES = [
+    {"issue_date_jalali": "1404/11/08"},
+    {"issue_date_jalali": "1404/11/10"},
+]
+
+LAB_RESULTS_BATCH_1 = [
+    {"sample_code": "A-1404/11/08-K-1", "gold_ppm": 1.45},
+    {"sample_code": "A-1404/11/08-K-2", "gold_ppm": 1.62},
+    {"sample_code": "A-1404/11/08-L-1", "gold_ppm": 0.28},
+    {"sample_code": "A-1404/11/08-CR-1", "gold_ppm": 485.0},
+    {"sample_code": "A-1404/11/08-T-1", "gold_ppm": 0.09},
+]
+
+LAB_RESULTS_BATCH_2 = [
+    {"sample_code": "B-1404/11/10-K-1", "gold_ppm": 1.38},
+    {"sample_code": "B-1404/11/10-L-1", "gold_ppm": 0.31},
+    {"sample_code": "B-1404/11/10-CR-1", "gold_ppm": 472.0},
+    {"sample_code": "RC-1404/11/10-1", "gold_ppm": 0.02},
 ]
 
 
@@ -125,6 +156,92 @@ async def seed():
             trucks_created += 1
         await session.commit()
         print(f"Truck loads created: {trucks_created}")
+
+        # Seed Bunker Loads
+        bunkers_created = 0
+        for b in BUNKER_LOADS:
+            existing = await session.execute(
+                select(BunkerLoad).where(BunkerLoad.receipt_number == b["receipt_number"])
+            )
+            if existing.scalar_one_or_none():
+                continue
+            greg_date = jalali_to_gregorian(b["date_jalali"])
+            bunker = BunkerLoad(
+                date_jalali=b["date_jalali"],
+                date_gregorian=greg_date,
+                source_facility=b["source_facility"],
+                receipt_number=b["receipt_number"],
+                tonnage_kg=b["tonnage_kg"],
+                truck_plate_number=b["truck_plate_number"],
+                driver_name=b["driver_name"],
+                status=RecordStatus.REGISTERED.value,
+            )
+            session.add(bunker)
+            bunkers_created += 1
+        await session.commit()
+        print(f"Bunker loads created: {bunkers_created}")
+
+        # Seed Lab Batches and Results
+        batches_created = 0
+        batch_map = {}
+        for lb in LAB_BATCHES:
+            existing = await session.execute(
+                select(LabIssueBatch).where(LabIssueBatch.issue_date_jalali == lb["issue_date_jalali"])
+            )
+            existing_batch = existing.scalar_one_or_none()
+            if existing_batch:
+                batch_map[lb["issue_date_jalali"]] = existing_batch
+                continue
+            greg_date = jalali_to_gregorian(lb["issue_date_jalali"])
+            batch = LabIssueBatch(
+                issue_date_jalali=lb["issue_date_jalali"],
+                issue_date_gregorian=greg_date,
+                status=RecordStatus.REGISTERED.value,
+            )
+            session.add(batch)
+            await session.flush()
+            batch_map[lb["issue_date_jalali"]] = batch
+            batches_created += 1
+        await session.commit()
+        print(f"Lab batches created: {batches_created}")
+
+        results_created = 0
+        batch_1 = batch_map.get("1404/11/08")
+        batch_2 = batch_map.get("1404/11/10")
+
+        for results_list, batch in [
+            (LAB_RESULTS_BATCH_1, batch_1),
+            (LAB_RESULTS_BATCH_2, batch_2),
+        ]:
+            if not batch:
+                continue
+            for r in results_list:
+                existing = await session.execute(
+                    select(LabResult).where(LabResult.sample_code == r["sample_code"])
+                )
+                if existing.scalar_one_or_none():
+                    continue
+                parsed = parse_sample_code(r["sample_code"])
+                sample_date_gregorian = None
+                if parsed.get("sample_date_jalali"):
+                    try:
+                        sample_date_gregorian = jalali_to_gregorian(parsed["sample_date_jalali"])
+                    except ValueError:
+                        pass
+                lab_result = LabResult(
+                    batch_id=batch.id,
+                    sample_code=r["sample_code"],
+                    gold_ppm=r["gold_ppm"],
+                    source_facility=parsed.get("source_facility"),
+                    sample_date_jalali=parsed.get("sample_date_jalali"),
+                    sample_date_gregorian=sample_date_gregorian,
+                    sample_type=parsed.get("sample_type"),
+                    sequence_number=parsed.get("sequence_number"),
+                )
+                session.add(lab_result)
+                results_created += 1
+        await session.commit()
+        print(f"Lab results created: {results_created}")
         print("Seed complete!")
 
 
