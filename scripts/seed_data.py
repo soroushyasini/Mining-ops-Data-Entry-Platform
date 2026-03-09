@@ -17,6 +17,8 @@ from app.modules.cars.models import Car
 from app.modules.trucks.models import TruckLoad
 from app.modules.bunkers.models import BunkerLoad
 from app.modules.lab.models import LabIssueBatch, LabResult
+from app.modules.grinding.models import GrindingLedgerEntry
+from app.modules.payments.models import PaymentGroup, Payment
 from app.shared.jalali import jalali_to_gregorian
 from app.shared.enums import RecordStatus
 from app.shared.sample_parser import parse_sample_code
@@ -242,6 +244,77 @@ async def seed():
                 results_created += 1
         await session.commit()
         print(f"Lab results created: {results_created}")
+
+        # Seed Grinding Ledger Entries
+        GRINDING_ENTRIES = [
+            {"date_jalali": "1404/11/04", "facility": "robat_sefid", "input_tonnage_kg": 23560, "output_tonnage_kg": 22800, "grinding_cost_rials": 45000000, "total_cost_rials": 45000000},
+            {"date_jalali": "1404/11/05", "facility": "robat_sefid", "input_tonnage_kg": 25100, "output_tonnage_kg": 24300, "grinding_cost_rials": 47000000, "total_cost_rials": 47000000},
+            {"date_jalali": "1404/11/06", "facility": "shen_beton", "input_tonnage_kg": 18900, "output_tonnage_kg": 18200, "grinding_cost_rials": 38000000, "total_cost_rials": 38000000},
+            {"date_jalali": "1404/11/08", "facility": "robat_sefid", "input_tonnage_kg": 24810, "notes": "Pending cost from bureau"},
+            {"date_jalali": "1404/11/09", "facility": "shen_beton", "input_tonnage_kg": 18760, "notes": "Pending cost from bureau"},
+        ]
+        grinding_created = 0
+        grinding_map = {}
+        for g in GRINDING_ENTRIES:
+            existing = await session.execute(
+                select(GrindingLedgerEntry).where(
+                    GrindingLedgerEntry.date_jalali == g["date_jalali"],
+                    GrindingLedgerEntry.facility == g["facility"],
+                )
+            )
+            existing_entry = existing.scalar_one_or_none()
+            if existing_entry:
+                key = (g["date_jalali"], g["facility"])
+                grinding_map[key] = existing_entry
+                continue
+            greg_date = jalali_to_gregorian(g["date_jalali"])
+            # Entries with cost fields start as "costed", others as "registered"
+            has_cost = g.get("grinding_cost_rials") is not None or g.get("total_cost_rials") is not None
+            entry_status = RecordStatus.COSTED.value if has_cost else RecordStatus.REGISTERED.value
+            entry = GrindingLedgerEntry(
+                date_jalali=g["date_jalali"],
+                date_gregorian=greg_date,
+                facility=g["facility"],
+                input_tonnage_kg=g["input_tonnage_kg"],
+                output_tonnage_kg=g.get("output_tonnage_kg"),
+                grinding_cost_rials=g.get("grinding_cost_rials"),
+                total_cost_rials=g.get("total_cost_rials"),
+                notes=g.get("notes"),
+                status=entry_status,
+            )
+            session.add(entry)
+            await session.flush()
+            key = (g["date_jalali"], g["facility"])
+            grinding_map[key] = entry
+            grinding_created += 1
+        await session.commit()
+        print(f"Grinding ledger entries created: {grinding_created}")
+
+        # Seed Payment Groups — link first two costed grinding entries
+        g1 = grinding_map.get(("1404/11/04", "robat_sefid"))
+        g2 = grinding_map.get(("1404/11/05", "robat_sefid"))
+        payment_groups_created = 0
+        if g1 and g2 and g1.status == RecordStatus.COSTED.value and g2.status == RecordStatus.COSTED.value:
+            existing_pg = await session.execute(
+                select(PaymentGroup).where(PaymentGroup.payment_date_jalali == "1404/11/15")
+            )
+            if not existing_pg.scalar_one_or_none():
+                pg = PaymentGroup(
+                    payment_date_jalali="1404/11/15",
+                    payment_date_gregorian=jalali_to_gregorian("1404/11/15"),
+                    payer_name="شرکت معدن طلا",
+                    bank_name="بانک ملی",
+                    total_amount_rials=92000000,
+                )
+                session.add(pg)
+                await session.flush()
+                session.add(Payment(group_id=pg.id, entity_type="grinding", entity_id=g1.id, amount_rials=45000000))
+                session.add(Payment(group_id=pg.id, entity_type="grinding", entity_id=g2.id, amount_rials=47000000))
+                g1.status = RecordStatus.PAID.value
+                g2.status = RecordStatus.PAID.value
+                await session.commit()
+                payment_groups_created += 1
+        print(f"Payment groups created: {payment_groups_created}")
         print("Seed complete!")
 
 

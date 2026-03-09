@@ -18,6 +18,8 @@ class EntityType(str, Enum):
     TRUCK = "truck"
     BUNKER = "bunker"
     LAB_BATCH = "lab_batch"
+    GRINDING = "grinding"
+    PAYMENT_GROUP = "payment_group"
 
 
 class SampleType(str, Enum):
